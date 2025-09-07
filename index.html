@@ -248,12 +248,13 @@
 
             <!-- Import from Excel -->
             <div class="bg-white rounded-xl p-6 card-shadow mb-8">
-                <h2 class="text-xl font-semibold text-gray-900 mb-6">Import Pelanggan dari Excel</h2>
+                <h2 class="text-xl font-semibold text-gray-900 mb-6">Import Pelanggan dari Excel (Maksimal 200 Data)</h2>
                 <div class="space-y-4">
                     <div class="flex items-center justify-between p-4 bg-blue-50 rounded-lg">
                         <div>
                             <h3 class="font-medium text-blue-900">Format Excel yang Diperlukan:</h3>
                             <p class="text-sm text-blue-700">Kolom: Nama, Alamat, Telepon, Paket, Tanggal_Mulai</p>
+                            <p class="text-xs text-blue-600 mt-1">✅ Mendukung hingga 200 data sekaligus dengan validasi otomatis</p>
                         </div>
                         <button onclick="downloadTemplate()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm transition-colors duration-200">
                             Download Template
@@ -264,6 +265,16 @@
                         <button onclick="importFromExcel()" class="bg-purple-600 hover:bg-purple-700 text-white px-6 py-2 rounded-lg transition-colors duration-200">
                             Import Excel
                         </button>
+                    </div>
+                    <div class="text-sm text-gray-600 bg-gray-50 p-3 rounded-lg">
+                        <strong>📋 Fitur Import Excel:</strong>
+                        <ul class="mt-1 space-y-1 text-xs">
+                            <li>• Validasi otomatis format data</li>
+                            <li>• Deteksi duplikat nama pelanggan</li>
+                            <li>• Progress indicator real-time</li>
+                            <li>• Laporan detail hasil import</li>
+                            <li>• Batch processing untuk performa optimal</li>
+                        </ul>
                     </div>
                 </div>
             </div>
@@ -1068,21 +1079,104 @@
             }
         }
 
-        // Download Excel template
+        // Download Excel template with 50 sample data
         function downloadTemplate() {
             const wb = XLSX.utils.book_new();
+            
+            // Create sample data with 50 rows for demonstration
             const ws_data = [
-                ['Nama', 'Alamat', 'Telepon', 'Paket', 'Tanggal_Mulai'],
-                ['Ahmad Rizki', 'Jl. Merdeka No. 123', '081234567890', 'Premium - 50 Mbps', '2024-01-01'],
-                ['Siti Nurhaliza', 'Jl. Sudirman No. 456', '081234567891', 'Standard - 25 Mbps', '2024-01-01']
+                ['Nama', 'Alamat', 'Telepon', 'Paket', 'Tanggal_Mulai']
             ];
+            
+            // Sample data generator
+            const sampleNames = [
+                'Ahmad Rizki', 'Siti Nurhaliza', 'Budi Santoso', 'Dewi Sartika', 'Andi Wijaya',
+                'Maya Sari', 'Rudi Hartono', 'Lina Marlina', 'Joko Susilo', 'Rina Wati',
+                'Dedi Kurniawan', 'Sari Indah', 'Hendra Gunawan', 'Fitri Handayani', 'Agus Salim',
+                'Ratna Sari', 'Bambang Sutrisno', 'Indira Sari', 'Wahyu Hidayat', 'Mega Wati',
+                'Fajar Nugroho', 'Dian Sastro', 'Rizky Pratama', 'Novi Amelia', 'Eko Prasetyo',
+                'Yuni Shara', 'Doni Setiawan', 'Lia Amalia', 'Toni Wijaya', 'Sinta Dewi',
+                'Arif Rahman', 'Putri Utami', 'Bayu Aji', 'Nita Sari', 'Dimas Anggara',
+                'Wulan Dari', 'Gilang Ramadhan', 'Ayu Ting Ting', 'Reza Rahadian', 'Citra Kirana',
+                'Vino Bastian', 'Raisa Andriana', 'Afgan Syahreza', 'Isyana Sarasvati', 'Raditya Dika',
+                'Maudy Ayunda', 'Nicholas Saputra', 'Dian Pelangi', 'Hamish Daud', 'Sheryl Sheinafia'
+            ];
+            
+            const sampleStreets = [
+                'Jl. Merdeka', 'Jl. Sudirman', 'Jl. Thamrin', 'Jl. Gatot Subroto', 'Jl. Kuningan',
+                'Jl. Kemang', 'Jl. Senopati', 'Jl. Menteng', 'Jl. Kebayoran', 'Jl. Pondok Indah',
+                'Jl. Kelapa Gading', 'Jl. Pluit', 'Jl. Sunter', 'Jl. Cempaka Putih', 'Jl. Senen',
+                'Jl. Tanah Abang', 'Jl. Mangga Besar', 'Jl. Glodok', 'Jl. Kota', 'Jl. Ancol'
+            ];
+            
+            const packages = ['Basic - 10 Mbps', 'Standard - 25 Mbps', 'Premium - 50 Mbps', 'Ultra - 100 Mbps'];
+            
+            // Generate 50 sample rows
+            for (let i = 0; i < 50; i++) {
+                const name = sampleNames[i % sampleNames.length];
+                const street = sampleStreets[i % sampleStreets.length];
+                const houseNumber = Math.floor(Math.random() * 999) + 1;
+                const address = `${street} No. ${houseNumber}`;
+                const phone = `0812${String(Math.floor(Math.random() * 100000000)).padStart(8, '0')}`;
+                const packageType = packages[i % packages.length];
+                const startDate = '2024-01-01';
+                
+                ws_data.push([name, address, phone, packageType, startDate]);
+            }
+            
             const ws = XLSX.utils.aoa_to_sheet(ws_data);
+            
+            // Set column widths
+            ws['!cols'] = [
+                { wch: 20 }, // Nama
+                { wch: 30 }, // Alamat
+                { wch: 15 }, // Telepon
+                { wch: 20 }, // Paket
+                { wch: 12 }  // Tanggal_Mulai
+            ];
+            
+            // Add instructions sheet
+            const instructionData = [
+                ['PETUNJUK PENGGUNAAN TEMPLATE EXCEL'],
+                [''],
+                ['1. FORMAT KOLOM YANG DIPERLUKAN:'],
+                ['   - Nama: Nama lengkap pelanggan (wajib diisi)'],
+                ['   - Alamat: Alamat lengkap pelanggan (wajib diisi)'],
+                ['   - Telepon: Nomor telepon pelanggan (wajib diisi)'],
+                ['   - Paket: Pilih salah satu dari paket berikut (wajib diisi):'],
+                ['     * Basic - 10 Mbps'],
+                ['     * Standard - 25 Mbps'],
+                ['     * Premium - 50 Mbps'],
+                ['     * Ultra - 100 Mbps'],
+                ['   - Tanggal_Mulai: Format YYYY-MM-DD (contoh: 2024-01-01)'],
+                [''],
+                ['2. ATURAN IMPORT:'],
+                ['   - Maksimal 200 baris data per import'],
+                ['   - Nama pelanggan tidak boleh duplikat'],
+                ['   - Semua kolom wajib diisi'],
+                ['   - Format tanggal harus benar (YYYY-MM-DD)'],
+                [''],
+                ['3. TIPS:'],
+                ['   - Gunakan sheet "Template Pelanggan" untuk data'],
+                ['   - Jangan mengubah nama kolom di baris pertama'],
+                ['   - Pastikan tidak ada baris kosong di tengah data'],
+                ['   - Simpan file dalam format .xlsx atau .xls'],
+                [''],
+                ['4. CONTOH DATA:'],
+                ['   Lihat sheet "Template Pelanggan" untuk 50 contoh data']
+            ];
+            
+            const instructionWs = XLSX.utils.aoa_to_sheet(instructionData);
+            instructionWs['!cols'] = [{ wch: 60 }];
+            
+            XLSX.utils.book_append_sheet(wb, instructionWs, 'Petunjuk');
             XLSX.utils.book_append_sheet(wb, ws, 'Template Pelanggan');
-            XLSX.writeFile(wb, 'template_pelanggan.xlsx');
-            showNotification('📥 Template Excel berhasil diunduh!', 'success');
+            
+            XLSX.writeFile(wb, 'template_pelanggan_200_data.xlsx');
+            showNotification('📥 Template Excel dengan 50 contoh data berhasil diunduh!', 'success');
         }
 
-        // Import from Excel
+        // Enhanced Import from Excel - supports up to 200 data with batch processing
         async function importFromExcel() {
             const fileInput = document.getElementById('excelFile');
             const file = fileInput.files[0];
@@ -1091,6 +1185,24 @@
                 showNotification('Pilih file Excel terlebih dahulu!', 'error');
                 return;
             }
+
+            // Show loading indicator
+            const loadingDiv = document.createElement('div');
+            loadingDiv.id = 'importLoading';
+            loadingDiv.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+            loadingDiv.innerHTML = `
+                <div class="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+                    <div class="flex items-center space-x-3">
+                        <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                        <div>
+                            <h3 class="text-lg font-semibold text-gray-900">Mengimport Data...</h3>
+                            <p class="text-sm text-gray-600">Mohon tunggu, sedang memproses file Excel</p>
+                            <div id="importProgress" class="text-xs text-blue-600 mt-1">Memulai import...</div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(loadingDiv);
 
             const reader = new FileReader();
             reader.onload = async function(e) {
@@ -1102,91 +1214,192 @@
                     const jsonData = XLSX.utils.sheet_to_json(worksheet);
 
                     if (jsonData.length === 0) {
+                        document.getElementById('importLoading').remove();
                         showNotification('File Excel kosong atau tidak ada data!', 'error');
                         return;
+                    }
+
+                    // Limit to 200 rows maximum
+                    const maxRows = Math.min(jsonData.length, 200);
+                    const dataToProcess = jsonData.slice(0, maxRows);
+
+                    if (jsonData.length > 200) {
+                        showNotification(`⚠️ File memiliki ${jsonData.length} baris. Hanya 200 baris pertama yang akan diproses.`, 'warning');
                     }
 
                     let importedCount = 0;
                     let errorMessages = [];
                     let skippedCount = 0;
+                    let duplicateCount = 0;
                     const validPackages = ['Basic - 10 Mbps', 'Standard - 25 Mbps', 'Premium - 50 Mbps', 'Ultra - 100 Mbps'];
+                    const validCustomers = [];
+                    const existingNames = customers.map(c => c.name.toLowerCase().trim());
 
-                    for (const [index, row] of jsonData.entries()) {
+                    // Update progress
+                    document.getElementById('importProgress').textContent = `Memvalidasi ${dataToProcess.length} baris data...`;
+
+                    // First pass: Validate all data
+                    for (const [index, row] of dataToProcess.entries()) {
                         const rowNumber = index + 2;
                         let rowErrors = [];
 
-                        if (customers.length >= 500) {
+                        // Check if we've reached the limit
+                        if (customers.length + validCustomers.length >= 500) {
                             skippedCount++;
                             continue;
                         }
 
-                        // Validation logic (same as before)
-                        if (!row.Nama || row.Nama.toString().trim() === '') {
+                        // Validate required fields
+                        const nama = row.Nama ? row.Nama.toString().trim() : '';
+                        const alamat = row.Alamat ? row.Alamat.toString().trim() : '';
+                        const telepon = row.Telepon ? row.Telepon.toString().trim() : '';
+                        const paket = row.Paket ? row.Paket.toString().trim() : '';
+                        const tanggalMulai = row.Tanggal_Mulai ? row.Tanggal_Mulai.toString().trim() : '';
+
+                        if (!nama) {
                             rowErrors.push('Nama kosong');
+                        } else if (existingNames.includes(nama.toLowerCase()) || 
+                                   validCustomers.some(c => c.name.toLowerCase() === nama.toLowerCase())) {
+                            duplicateCount++;
+                            continue; // Skip duplicate names
                         }
-                        if (!row.Alamat || row.Alamat.toString().trim() === '') {
+
+                        if (!alamat) {
                             rowErrors.push('Alamat kosong');
                         }
-                        if (!row.Telepon || row.Telepon.toString().trim() === '') {
+                        if (!telepon) {
                             rowErrors.push('Telepon kosong');
                         }
-                        if (!row.Paket || row.Paket.toString().trim() === '') {
+                        if (!paket) {
                             rowErrors.push('Paket kosong');
-                        } else if (!validPackages.includes(row.Paket.toString().trim())) {
-                            rowErrors.push(`Paket tidak valid`);
+                        } else if (!validPackages.includes(paket)) {
+                            rowErrors.push(`Paket tidak valid (gunakan: ${validPackages.join(', ')})`);
                         }
-                        if (!row.Tanggal_Mulai || row.Tanggal_Mulai.toString().trim() === '') {
+                        if (!tanggalMulai) {
                             rowErrors.push('Tanggal Mulai kosong');
+                        } else {
+                            // Validate date format
+                            const dateTest = new Date(tanggalMulai);
+                            if (isNaN(dateTest.getTime())) {
+                                rowErrors.push('Format tanggal tidak valid (gunakan YYYY-MM-DD)');
+                            }
                         }
 
                         if (rowErrors.length > 0) {
                             errorMessages.push(`Baris ${rowNumber}: ${rowErrors.join(', ')}`);
                         } else {
-                            try {
-                                await dbManager.addCustomer({
-                                    name: row.Nama.toString().trim(),
-                                    address: row.Alamat.toString().trim(),
-                                    phone: row.Telepon.toString().trim(),
-                                    package: row.Paket.toString().trim(),
-                                    startDate: new Date(row.Tanggal_Mulai).toISOString().split('T')[0]
-                                });
-                                importedCount++;
-                            } catch (error) {
-                                errorMessages.push(`Baris ${rowNumber}: Gagal menyimpan data`);
+                            validCustomers.push({
+                                name: nama,
+                                address: alamat,
+                                phone: telepon,
+                                package: paket,
+                                startDate: new Date(tanggalMulai).toISOString().split('T')[0]
+                            });
+                        }
+                    }
+
+                    // Second pass: Import valid customers in batches
+                    if (validCustomers.length > 0) {
+                        document.getElementById('importProgress').textContent = `Menyimpan ${validCustomers.length} pelanggan valid...`;
+                        
+                        const batchSize = 10; // Process 10 customers at a time
+                        const totalBatches = Math.ceil(validCustomers.length / batchSize);
+
+                        for (let batchIndex = 0; batchIndex < totalBatches; batchIndex++) {
+                            const startIndex = batchIndex * batchSize;
+                            const endIndex = Math.min(startIndex + batchSize, validCustomers.length);
+                            const batch = validCustomers.slice(startIndex, endIndex);
+
+                            // Update progress
+                            document.getElementById('importProgress').textContent = 
+                                `Batch ${batchIndex + 1}/${totalBatches}: Menyimpan ${startIndex + 1}-${endIndex} dari ${validCustomers.length}`;
+
+                            // Process batch
+                            const batchPromises = batch.map(async (customerData) => {
+                                try {
+                                    await dbManager.addCustomer(customerData);
+                                    importedCount++;
+                                } catch (error) {
+                                    errorMessages.push(`Error menyimpan ${customerData.name}: ${error.message}`);
+                                }
+                            });
+
+                            await Promise.all(batchPromises);
+
+                            // Small delay between batches to prevent overwhelming
+                            if (batchIndex < totalBatches - 1) {
+                                await new Promise(resolve => setTimeout(resolve, 100));
                             }
                         }
                     }
 
-                    // Show results
+                    // Remove loading indicator
+                    document.getElementById('importLoading').remove();
+
+                    // Show comprehensive results
+                    const resultMessages = [];
                     if (importedCount > 0) {
-                        showNotification(`✅ ${importedCount} pelanggan berhasil diimport!`, 'success');
+                        resultMessages.push(`✅ ${importedCount} pelanggan berhasil diimport`);
+                    }
+                    if (duplicateCount > 0) {
+                        resultMessages.push(`⚠️ ${duplicateCount} data duplikat dilewati`);
+                    }
+                    if (skippedCount > 0) {
+                        resultMessages.push(`⚠️ ${skippedCount} data dilewati (batas maksimal tercapai)`);
+                    }
+                    if (errorMessages.length > 0) {
+                        resultMessages.push(`❌ ${errorMessages.length} data error`);
                     }
 
+                    // Show success notification
+                    if (importedCount > 0) {
+                        showNotification(resultMessages.join(' | '), 'success');
+                    } else if (errorMessages.length > 0) {
+                        showNotification('Import gagal - periksa format data Excel!', 'error');
+                    }
+
+                    // Show detailed error report if any
                     if (errorMessages.length > 0) {
                         const errorDiv = document.createElement('div');
-                        errorDiv.className = 'fixed top-4 right-4 z-50 bg-red-500 text-white p-4 rounded-lg max-w-md max-h-96 overflow-y-auto';
+                        errorDiv.className = 'fixed top-4 right-4 z-50 bg-red-500 text-white p-4 rounded-lg max-w-lg max-h-96 overflow-y-auto shadow-2xl';
                         errorDiv.innerHTML = `
-                            <div class="flex justify-between items-start mb-2">
-                                <h4 class="font-semibold">❌ Error Import (${errorMessages.length} baris)</h4>
-                                <button onclick="this.parentElement.parentElement.remove()" class="text-white hover:text-gray-200">✕</button>
+                            <div class="flex justify-between items-start mb-3">
+                                <div>
+                                    <h4 class="font-semibold text-lg">📋 Laporan Import Excel</h4>
+                                    <p class="text-sm opacity-90">Total ${dataToProcess.length} baris diproses</p>
+                                </div>
+                                <button onclick="this.parentElement.parentElement.remove()" class="text-white hover:text-gray-200 text-xl">✕</button>
                             </div>
-                            <div class="text-sm space-y-1">
-                                ${errorMessages.slice(0, 10).map(msg => `<div>• ${msg}</div>`).join('')}
-                                ${errorMessages.length > 10 ? `<div class="font-semibold">... dan ${errorMessages.length - 10} error lainnya</div>` : ''}
+                            <div class="space-y-2 mb-3">
+                                <div class="text-sm bg-green-600 bg-opacity-50 p-2 rounded">✅ Berhasil: ${importedCount}</div>
+                                ${duplicateCount > 0 ? `<div class="text-sm bg-yellow-600 bg-opacity-50 p-2 rounded">⚠️ Duplikat: ${duplicateCount}</div>` : ''}
+                                ${skippedCount > 0 ? `<div class="text-sm bg-orange-600 bg-opacity-50 p-2 rounded">⚠️ Dilewati: ${skippedCount}</div>` : ''}
+                                <div class="text-sm bg-red-600 bg-opacity-50 p-2 rounded">❌ Error: ${errorMessages.length}</div>
                             </div>
+                            ${errorMessages.length > 0 ? `
+                                <div class="text-sm space-y-1 max-h-40 overflow-y-auto">
+                                    <div class="font-semibold mb-1">Detail Error:</div>
+                                    ${errorMessages.slice(0, 15).map(msg => `<div class="text-xs bg-black bg-opacity-20 p-1 rounded">• ${msg}</div>`).join('')}
+                                    ${errorMessages.length > 15 ? `<div class="font-semibold text-xs">... dan ${errorMessages.length - 15} error lainnya</div>` : ''}
+                                </div>
+                            ` : ''}
                         `;
                         document.body.appendChild(errorDiv);
                         
+                        // Auto remove after 15 seconds
                         setTimeout(() => {
                             if (errorDiv.parentElement) {
                                 errorDiv.remove();
                             }
-                        }, 10000);
+                        }, 15000);
                     }
 
+                    // Clear file input
                     fileInput.value = '';
+
                 } catch (error) {
-                    showNotification('❌ Error membaca file Excel!', 'error');
+                    document.getElementById('importLoading').remove();
+                    showNotification('❌ Error membaca file Excel! Pastikan format file benar.', 'error');
                     console.error('Excel import error:', error);
                 }
             };
@@ -1253,5 +1466,5 @@
             document.getElementById('customerStartDate').value = new Date().toISOString().split('T')[0];
         });
     </script>
-<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'97b3f405b25ffd96',t:'MTc1NzIyNDQ4NS4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'97b4152f877bfcef',t:'MTc1NzIyNTg0My4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
