@@ -1,0 +1,1257 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tagihan Internet - Sistem Manajemen (Multi-Device Sync)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    
+    <!-- Firebase SDK -->
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
+        import { getFirestore, collection, addDoc, getDocs, doc, updateDoc, deleteDoc, onSnapshot, query, orderBy } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
+        
+        // Firebase configuration (Demo - replace with your own)
+        const firebaseConfig = {
+            apiKey: "demo-api-key",
+            authDomain: "demo-project.firebaseapp.com",
+            projectId: "demo-tagihan-internet",
+            storageBucket: "demo-project.appspot.com",
+            messagingSenderId: "123456789",
+            appId: "demo-app-id"
+        };
+
+        // Initialize Firebase
+        let app, db;
+        let isFirebaseConnected = false;
+        
+        try {
+            app = initializeApp(firebaseConfig);
+            db = getFirestore(app);
+            isFirebaseConnected = true;
+            console.log('Firebase connected successfully');
+        } catch (error) {
+            console.log('Firebase connection failed, using local storage:', error);
+            isFirebaseConnected = false;
+        }
+
+        // Make Firebase functions available globally
+        window.firebaseDB = {
+            db,
+            collection,
+            addDoc,
+            getDocs,
+            doc,
+            updateDoc,
+            deleteDoc,
+            onSnapshot,
+            query,
+            orderBy,
+            isConnected: isFirebaseConnected
+        };
+    </script>
+    
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+        .gradient-bg { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+        .card-shadow { box-shadow: 0 10px 25px rgba(0,0,0,0.1); }
+        .status-paid { background: linear-gradient(45deg, #10b981, #059669); }
+        .status-unpaid { background: linear-gradient(45deg, #ef4444, #dc2626); }
+        .status-pending { background: linear-gradient(45deg, #f59e0b, #d97706); }
+        .sync-indicator { 
+            position: fixed; 
+            top: 20px; 
+            left: 20px; 
+            z-index: 1000;
+            transition: all 0.3s ease;
+        }
+        .pulse { animation: pulse 2s infinite; }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <!-- Sync Status Indicator -->
+    <div id="syncIndicator" class="sync-indicator">
+        <div class="flex items-center space-x-2 bg-white rounded-full px-3 py-2 shadow-lg">
+            <div id="syncStatus" class="w-3 h-3 rounded-full bg-yellow-500 pulse"></div>
+            <span id="syncText" class="text-sm font-medium text-gray-700">Menghubungkan...</span>
+        </div>
+    </div>
+
+    <!-- Header -->
+    <header class="gradient-bg text-white shadow-lg">
+        <div class="container mx-auto px-4 py-6">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-3">
+                    <div class="w-10 h-10 bg-white bg-opacity-20 rounded-lg flex items-center justify-center">
+                        <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
+                            <path d="M3 4a1 1 0 011-1h12a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1V4zM3 10a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H4a1 1 0 01-1-1v-6zM14 9a1 1 0 00-1 1v6a1 1 0 001 1h2a1 1 0 001-1v-6a1 1 0 00-1-1h-2z"/>
+                        </svg>
+                    </div>
+                    <div>
+                        <h1 class="text-2xl font-bold">Tagihan Internet</h1>
+                        <p class="text-blue-100 text-sm">Sistem Multi-Device Sync</p>
+                    </div>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <button onclick="forceSync()" class="bg-white bg-opacity-20 hover:bg-opacity-30 px-4 py-2 rounded-lg transition-all duration-200 flex items-center space-x-2">
+                        <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clip-rule="evenodd"/>
+                        </svg>
+                        <span>Sync</span>
+                    </button>
+                    <button onclick="exportToPDF()" class="bg-white bg-opacity-20 hover:bg-opacity-30 px-4 py-2 rounded-lg transition-all duration-200 flex items-center space-x-2">
+                        <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd"/>
+                        </svg>
+                        <span>Export PDF</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <div class="container mx-auto px-4 py-8">
+        <!-- Navigation Tabs -->
+        <div class="bg-white rounded-xl card-shadow mb-8">
+            <div class="flex border-b border-gray-200">
+                <button onclick="switchTab('dashboard')" id="dashboardTab" class="px-6 py-4 text-sm font-medium text-blue-600 border-b-2 border-blue-600 bg-blue-50">
+                    Dashboard
+                </button>
+                <button onclick="switchTab('customers')" id="customersTab" class="px-6 py-4 text-sm font-medium text-gray-500 hover:text-gray-700 hover:bg-gray-50">
+                    Kelola Pelanggan
+                </button>
+                <button onclick="switchTab('bills')" id="billsTab" class="px-6 py-4 text-sm font-medium text-gray-500 hover:text-gray-700 hover:bg-gray-50">
+                    Tagihan
+                </button>
+            </div>
+        </div>
+
+        <!-- Dashboard Tab -->
+        <div id="dashboardContent">
+        <!-- Stats Cards -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+            <div class="bg-white rounded-xl p-6 card-shadow">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-gray-500 text-sm font-medium">Total Pengguna</p>
+                        <p class="text-2xl font-bold text-gray-900" id="totalUsers">0</p>
+                    </div>
+                    <div class="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+                        <svg class="w-6 h-6 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+                            <path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z"/>
+                        </svg>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="bg-white rounded-xl p-6 card-shadow">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-gray-500 text-sm font-medium">Sudah Bayar</p>
+                        <p class="text-2xl font-bold text-green-600" id="paidCount">0</p>
+                    </div>
+                    <div class="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
+                        <svg class="w-6 h-6 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+                        </svg>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="bg-white rounded-xl p-6 card-shadow">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-gray-500 text-sm font-medium">Belum Bayar</p>
+                        <p class="text-2xl font-bold text-red-600" id="unpaidCount">0</p>
+                    </div>
+                    <div class="w-12 h-12 bg-red-100 rounded-lg flex items-center justify-center">
+                        <svg class="w-6 h-6 text-red-600" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"/>
+                        </svg>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="bg-white rounded-xl p-6 card-shadow">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-gray-500 text-sm font-medium">Total Tagihan</p>
+                        <p class="text-2xl font-bold text-purple-600" id="totalAmount">Rp 0</p>
+                    </div>
+                    <div class="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
+                        <svg class="w-6 h-6 text-purple-600" fill="currentColor" viewBox="0 0 20 20">
+                            <path d="M8.433 7.418c.155-.103.346-.196.567-.267v1.698a2.305 2.305 0 01-.567-.267C8.07 8.34 8 8.114 8 8c0-.114.07-.34.433-.582zM11 12.849v-1.698c.22.071.412.164.567.267.364.243.433.468.433.582 0 .114-.07.34-.433.582a2.305 2.305 0 01-.567.267z"/>
+                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-13a1 1 0 10-2 0v.092a4.535 4.535 0 00-1.676.662C6.602 6.234 6 7.009 6 8c0 .99.602 1.765 1.324 2.246.48.32 1.054.545 1.676.662v1.941c-.391-.127-.68-.317-.843-.504a1 1 0 10-1.51 1.31c.562.649 1.413 1.076 2.353 1.253V15a1 1 0 102 0v-.092a4.535 4.535 0 001.676-.662C13.398 13.766 14 12.991 14 12c0-.99-.602-1.765-1.324-2.246A4.535 4.535 0 0011 9.092V7.151c.391.127.68.317.843.504a1 1 0 101.511-1.31c-.563-.649-1.413-1.076-2.354-1.253V5z" clip-rule="evenodd"/>
+                        </svg>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Real-time Activity Feed -->
+        <div class="bg-white rounded-xl p-6 card-shadow mb-8">
+            <h2 class="text-xl font-semibold text-gray-900 mb-4">Aktivitas Real-time</h2>
+            <div id="activityFeed" class="space-y-2 max-h-40 overflow-y-auto">
+                <div class="text-sm text-gray-500 italic">Memuat aktivitas...</div>
+            </div>
+        </div>
+
+        </div>
+
+        <!-- Customer Management Tab -->
+        <div id="customersContent" class="hidden">
+            <!-- Add Customer Form -->
+            <div class="bg-white rounded-xl p-6 card-shadow mb-8">
+                <h2 class="text-xl font-semibold text-gray-900 mb-6">Tambah Pelanggan Manual</h2>
+                <form id="customerForm" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Nama Lengkap</label>
+                        <input type="text" id="customerName" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Alamat</label>
+                        <input type="text" id="customerAddress" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">No. Telepon</label>
+                        <input type="tel" id="customerPhone" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Paket Internet</label>
+                        <select id="customerPackage" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                            <option value="">Pilih Paket</option>
+                            <option value="Basic - 10 Mbps">Basic - 10 Mbps (Rp 100.000)</option>
+                            <option value="Standard - 25 Mbps">Standard - 25 Mbps (Rp 150.000)</option>
+                            <option value="Premium - 50 Mbps">Premium - 50 Mbps (Rp 200.000)</option>
+                            <option value="Ultra - 100 Mbps">Ultra - 100 Mbps (Rp 300.000)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Tanggal Mulai</label>
+                        <input type="date" id="customerStartDate" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                    </div>
+                    <div class="flex items-end">
+                        <button type="submit" class="w-full bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200">
+                            Tambah Pelanggan
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Import from Excel -->
+            <div class="bg-white rounded-xl p-6 card-shadow mb-8">
+                <h2 class="text-xl font-semibold text-gray-900 mb-6">Import Pelanggan dari Excel</h2>
+                <div class="space-y-4">
+                    <div class="flex items-center justify-between p-4 bg-blue-50 rounded-lg">
+                        <div>
+                            <h3 class="font-medium text-blue-900">Format Excel yang Diperlukan:</h3>
+                            <p class="text-sm text-blue-700">Kolom: Nama, Alamat, Telepon, Paket, Tanggal_Mulai</p>
+                        </div>
+                        <button onclick="downloadTemplate()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm transition-colors duration-200">
+                            Download Template
+                        </button>
+                    </div>
+                    <div class="flex items-center space-x-4">
+                        <input type="file" id="excelFile" accept=".xlsx,.xls" class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                        <button onclick="importFromExcel()" class="bg-purple-600 hover:bg-purple-700 text-white px-6 py-2 rounded-lg transition-colors duration-200">
+                            Import Excel
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Customers List -->
+            <div class="bg-white rounded-xl card-shadow overflow-hidden">
+                <div class="px-6 py-4 border-b border-gray-200">
+                    <h2 class="text-xl font-semibold text-gray-900">Daftar Pelanggan</h2>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nama</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Alamat</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Telepon</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Paket</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tanggal Mulai</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Aksi</th>
+                            </tr>
+                        </thead>
+                        <tbody id="customersTable" class="bg-white divide-y divide-gray-200">
+                            <!-- Customers will be populated here -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Bills Tab -->
+        <div id="billsContent" class="hidden">
+        <!-- Add New Bill Form -->
+        <div class="bg-white rounded-xl p-6 card-shadow mb-8">
+            <h2 class="text-xl font-semibold text-gray-900 mb-6">Tambah Tagihan Baru</h2>
+            
+            <!-- Input Method Selection -->
+            <div class="mb-6">
+                <label class="block text-sm font-medium text-gray-700 mb-3">Pilih Metode Input:</label>
+                <div class="flex space-x-4">
+                    <label class="flex items-center">
+                        <input type="radio" name="inputMethod" value="fromCustomers" checked onchange="toggleInputMethod()" class="mr-2 text-blue-600">
+                        <span class="text-sm text-gray-700">Dari Daftar Pelanggan</span>
+                    </label>
+                    <label class="flex items-center">
+                        <input type="radio" name="inputMethod" value="manual" onchange="toggleInputMethod()" class="mr-2 text-blue-600">
+                        <span class="text-sm text-gray-700">Input Manual</span>
+                    </label>
+                </div>
+            </div>
+
+            <form id="billForm" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <!-- From Customers Method -->
+                <div id="fromCustomersFields">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Nama Pelanggan</label>
+                        <select id="userName" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" onchange="fillCustomerData()">
+                            <option value="">Pilih Pelanggan</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Paket Internet</label>
+                        <input type="text" id="packageFromCustomer" readonly class="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-600" placeholder="Otomatis terisi">
+                    </div>
+                </div>
+
+                <!-- Manual Method -->
+                <div id="manualFields" class="hidden">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Nama Pengguna</label>
+                        <input type="text" id="userNameManual" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="Masukkan nama">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Paket Internet</label>
+                        <select id="packageManual" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                            <option value="">Pilih Paket</option>
+                            <option value="Basic - 10 Mbps">Basic - 10 Mbps</option>
+                            <option value="Standard - 25 Mbps">Standard - 25 Mbps</option>
+                            <option value="Premium - 50 Mbps">Premium - 50 Mbps</option>
+                            <option value="Ultra - 100 Mbps">Ultra - 100 Mbps</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Jumlah Tagihan</label>
+                    <input type="number" id="amount" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="150000">
+                </div>
+                <div class="flex items-end">
+                    <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200">
+                        Tambah Tagihan
+                    </button>
+                </div>
+            </form>
+
+            <!-- Bulk Bill Creation -->
+            <div class="mt-8 pt-6 border-t border-gray-200">
+                <h3 class="text-lg font-semibold text-gray-900 mb-4">Buat Tagihan untuk Semua Pelanggan</h3>
+                <div class="flex items-center space-x-4">
+                    <div class="flex-1">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Jumlah Tagihan untuk Semua</label>
+                        <input type="number" id="bulkAmount" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="150000">
+                    </div>
+                    <div class="flex items-end">
+                        <button onclick="createBulkBills()" class="bg-purple-600 hover:bg-purple-700 text-white font-medium py-2 px-6 rounded-lg transition-colors duration-200">
+                            Buat Tagihan Semua
+                        </button>
+                    </div>
+                </div>
+                <p class="text-sm text-gray-500 mt-2">Akan membuat tagihan untuk semua pelanggan dengan jumlah yang sama</p>
+            </div>
+        </div>
+
+        <!-- Bills Table -->
+        <div class="bg-white rounded-xl card-shadow overflow-hidden">
+            <div class="px-6 py-4 border-b border-gray-200">
+                <h2 class="text-xl font-semibold text-gray-900">Daftar Tagihan</h2>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Pengguna</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Paket</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Jumlah</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tanggal</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Aksi</th>
+                        </tr>
+                    </thead>
+                    <tbody id="billsTable" class="bg-white divide-y divide-gray-200">
+                        <!-- Bills will be populated here -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Global variables
+        let bills = [];
+        let customers = [];
+        let currentTab = 'dashboard';
+        let syncListeners = [];
+        let activityLog = [];
+        
+        // Database operations
+        class DatabaseManager {
+            constructor() {
+                this.isOnline = window.firebaseDB && window.firebaseDB.isConnected;
+                this.updateSyncStatus();
+                
+                if (this.isOnline) {
+                    this.setupRealtimeListeners();
+                } else {
+                    this.loadFromLocalStorage();
+                }
+            }
+
+            updateSyncStatus() {
+                const indicator = document.getElementById('syncStatus');
+                const text = document.getElementById('syncText');
+                
+                if (this.isOnline) {
+                    indicator.className = 'w-3 h-3 rounded-full bg-green-500';
+                    text.textContent = 'Tersinkronisasi';
+                } else {
+                    indicator.className = 'w-3 h-3 rounded-full bg-red-500';
+                    text.textContent = 'Mode Offline';
+                }
+            }
+
+            async setupRealtimeListeners() {
+                if (!this.isOnline) return;
+
+                try {
+                    // Listen to customers changes
+                    const customersQuery = window.firebaseDB.query(
+                        window.firebaseDB.collection(window.firebaseDB.db, 'customers'),
+                        window.firebaseDB.orderBy('createdAt', 'desc')
+                    );
+                    
+                    window.firebaseDB.onSnapshot(customersQuery, (snapshot) => {
+                        customers = [];
+                        snapshot.forEach((doc) => {
+                            customers.push({ id: doc.id, ...doc.data() });
+                        });
+                        this.saveToLocalStorage();
+                        renderCustomers();
+                        updateCustomerDropdown();
+                        this.addActivity('📥 Data pelanggan diperbarui');
+                    });
+
+                    // Listen to bills changes
+                    const billsQuery = window.firebaseDB.query(
+                        window.firebaseDB.collection(window.firebaseDB.db, 'bills'),
+                        window.firebaseDB.orderBy('createdAt', 'desc')
+                    );
+                    
+                    window.firebaseDB.onSnapshot(billsQuery, (snapshot) => {
+                        bills = [];
+                        snapshot.forEach((doc) => {
+                            bills.push({ id: doc.id, ...doc.data() });
+                        });
+                        this.saveToLocalStorage();
+                        updateStats();
+                        renderBills();
+                        this.addActivity('💰 Data tagihan diperbarui');
+                    });
+
+                    this.addActivity('🔄 Sinkronisasi real-time aktif');
+                } catch (error) {
+                    console.error('Error setting up listeners:', error);
+                    this.isOnline = false;
+                    this.updateSyncStatus();
+                    this.loadFromLocalStorage();
+                }
+            }
+
+            loadFromLocalStorage() {
+                bills = JSON.parse(localStorage.getItem('internetBills')) || [];
+                customers = JSON.parse(localStorage.getItem('internetCustomers')) || [];
+                
+                // Initialize with sample data if empty
+                if (bills.length === 0 && customers.length === 0) {
+                    this.initializeSampleData();
+                }
+                
+                updateStats();
+                renderBills();
+                renderCustomers();
+                updateCustomerDropdown();
+                this.addActivity('💾 Data dimuat dari penyimpanan lokal');
+            }
+
+            saveToLocalStorage() {
+                localStorage.setItem('internetBills', JSON.stringify(bills));
+                localStorage.setItem('internetCustomers', JSON.stringify(customers));
+            }
+
+            initializeSampleData() {
+                customers = [
+                    {
+                        id: 'sample1',
+                        name: 'Ahmad Rizki',
+                        address: 'Jl. Merdeka No. 123',
+                        phone: '081234567890',
+                        package: 'Premium - 50 Mbps',
+                        startDate: '2024-01-01',
+                        createdAt: new Date()
+                    },
+                    {
+                        id: 'sample2',
+                        name: 'Siti Nurhaliza',
+                        address: 'Jl. Sudirman No. 456',
+                        phone: '081234567891',
+                        package: 'Standard - 25 Mbps',
+                        startDate: '2024-01-01',
+                        createdAt: new Date()
+                    }
+                ];
+
+                bills = [
+                    {
+                        id: 'bill1',
+                        userName: 'Ahmad Rizki',
+                        package: 'Premium - 50 Mbps',
+                        amount: 200000,
+                        date: '2024-01-15',
+                        status: 'paid',
+                        createdAt: new Date()
+                    },
+                    {
+                        id: 'bill2',
+                        userName: 'Siti Nurhaliza',
+                        package: 'Standard - 25 Mbps',
+                        amount: 150000,
+                        date: '2024-01-15',
+                        status: 'unpaid',
+                        createdAt: new Date()
+                    }
+                ];
+
+                this.saveToLocalStorage();
+            }
+
+            async addCustomer(customerData) {
+                const newCustomer = {
+                    ...customerData,
+                    createdAt: new Date(),
+                    updatedAt: new Date()
+                };
+
+                if (this.isOnline) {
+                    try {
+                        const docRef = await window.firebaseDB.addDoc(
+                            window.firebaseDB.collection(window.firebaseDB.db, 'customers'),
+                            newCustomer
+                        );
+                        this.addActivity(`👤 Pelanggan ${customerData.name} ditambahkan`);
+                        return docRef.id;
+                    } catch (error) {
+                        console.error('Error adding customer:', error);
+                        throw error;
+                    }
+                } else {
+                    newCustomer.id = Date.now().toString();
+                    customers.push(newCustomer);
+                    this.saveToLocalStorage();
+                    renderCustomers();
+                    updateCustomerDropdown();
+                    this.addActivity(`👤 Pelanggan ${customerData.name} ditambahkan (offline)`);
+                    return newCustomer.id;
+                }
+            }
+
+            async addBill(billData) {
+                const newBill = {
+                    ...billData,
+                    createdAt: new Date(),
+                    updatedAt: new Date()
+                };
+
+                if (this.isOnline) {
+                    try {
+                        const docRef = await window.firebaseDB.addDoc(
+                            window.firebaseDB.collection(window.firebaseDB.db, 'bills'),
+                            newBill
+                        );
+                        this.addActivity(`💰 Tagihan ${billData.userName} ditambahkan`);
+                        return docRef.id;
+                    } catch (error) {
+                        console.error('Error adding bill:', error);
+                        throw error;
+                    }
+                } else {
+                    newBill.id = Date.now().toString();
+                    bills.push(newBill);
+                    this.saveToLocalStorage();
+                    updateStats();
+                    renderBills();
+                    this.addActivity(`💰 Tagihan ${billData.userName} ditambahkan (offline)`);
+                    return newBill.id;
+                }
+            }
+
+            async updateBill(billId, updates) {
+                if (this.isOnline) {
+                    try {
+                        await window.firebaseDB.updateDoc(
+                            window.firebaseDB.doc(window.firebaseDB.db, 'bills', billId),
+                            { ...updates, updatedAt: new Date() }
+                        );
+                        this.addActivity(`✏️ Tagihan diperbarui`);
+                    } catch (error) {
+                        console.error('Error updating bill:', error);
+                        throw error;
+                    }
+                } else {
+                    const billIndex = bills.findIndex(b => b.id === billId);
+                    if (billIndex !== -1) {
+                        bills[billIndex] = { ...bills[billIndex], ...updates, updatedAt: new Date() };
+                        this.saveToLocalStorage();
+                        updateStats();
+                        renderBills();
+                        this.addActivity(`✏️ Tagihan diperbarui (offline)`);
+                    }
+                }
+            }
+
+            async deleteBill(billId) {
+                if (this.isOnline) {
+                    try {
+                        await window.firebaseDB.deleteDoc(
+                            window.firebaseDB.doc(window.firebaseDB.db, 'bills', billId)
+                        );
+                        this.addActivity(`🗑️ Tagihan dihapus`);
+                    } catch (error) {
+                        console.error('Error deleting bill:', error);
+                        throw error;
+                    }
+                } else {
+                    bills = bills.filter(b => b.id !== billId);
+                    this.saveToLocalStorage();
+                    updateStats();
+                    renderBills();
+                    this.addActivity(`🗑️ Tagihan dihapus (offline)`);
+                }
+            }
+
+            async deleteCustomer(customerId) {
+                if (this.isOnline) {
+                    try {
+                        await window.firebaseDB.deleteDoc(
+                            window.firebaseDB.doc(window.firebaseDB.db, 'customers', customerId)
+                        );
+                        this.addActivity(`🗑️ Pelanggan dihapus`);
+                    } catch (error) {
+                        console.error('Error deleting customer:', error);
+                        throw error;
+                    }
+                } else {
+                    customers = customers.filter(c => c.id !== customerId);
+                    this.saveToLocalStorage();
+                    renderCustomers();
+                    updateCustomerDropdown();
+                    this.addActivity(`🗑️ Pelanggan dihapus (offline)`);
+                }
+            }
+
+            addActivity(message) {
+                const timestamp = new Date().toLocaleTimeString('id-ID');
+                activityLog.unshift(`${timestamp} - ${message}`);
+                
+                // Keep only last 10 activities
+                if (activityLog.length > 10) {
+                    activityLog = activityLog.slice(0, 10);
+                }
+                
+                this.renderActivityFeed();
+            }
+
+            renderActivityFeed() {
+                const feed = document.getElementById('activityFeed');
+                if (activityLog.length === 0) {
+                    feed.innerHTML = '<div class="text-sm text-gray-500 italic">Belum ada aktivitas</div>';
+                } else {
+                    feed.innerHTML = activityLog.map(activity => 
+                        `<div class="text-sm text-gray-600 p-2 bg-gray-50 rounded">${activity}</div>`
+                    ).join('');
+                }
+            }
+        }
+
+        // Initialize database manager
+        let dbManager;
+        
+        // Wait for Firebase to load
+        setTimeout(() => {
+            dbManager = new DatabaseManager();
+        }, 1000);
+
+        // Switch tabs
+        function switchTab(tab) {
+            // Hide all content
+            document.getElementById('dashboardContent').classList.add('hidden');
+            document.getElementById('customersContent').classList.add('hidden');
+            document.getElementById('billsContent').classList.add('hidden');
+            
+            // Remove active styles from all tabs
+            document.getElementById('dashboardTab').className = 'px-6 py-4 text-sm font-medium text-gray-500 hover:text-gray-700 hover:bg-gray-50';
+            document.getElementById('customersTab').className = 'px-6 py-4 text-sm font-medium text-gray-500 hover:text-gray-700 hover:bg-gray-50';
+            document.getElementById('billsTab').className = 'px-6 py-4 text-sm font-medium text-gray-500 hover:text-gray-700 hover:bg-gray-50';
+            
+            // Show selected content and activate tab
+            document.getElementById(tab + 'Content').classList.remove('hidden');
+            document.getElementById(tab + 'Tab').className = 'px-6 py-4 text-sm font-medium text-blue-600 border-b-2 border-blue-600 bg-blue-50';
+            
+            currentTab = tab;
+        }
+
+        // Force sync
+        function forceSync() {
+            if (dbManager && dbManager.isOnline) {
+                showNotification('🔄 Menyinkronkan data...', 'success');
+                dbManager.addActivity('🔄 Sinkronisasi manual dimulai');
+            } else {
+                showNotification('❌ Tidak dapat sinkronisasi - mode offline', 'error');
+            }
+        }
+
+        // Update statistics
+        function updateStats() {
+            const totalUsers = bills.length;
+            const paidCount = bills.filter(bill => bill.status === 'paid').length;
+            const unpaidCount = bills.filter(bill => bill.status === 'unpaid').length;
+            const totalAmount = bills.reduce((sum, bill) => sum + bill.amount, 0);
+
+            document.getElementById('totalUsers').textContent = totalUsers;
+            document.getElementById('paidCount').textContent = paidCount;
+            document.getElementById('unpaidCount').textContent = unpaidCount;
+            document.getElementById('totalAmount').textContent = formatCurrency(totalAmount);
+        }
+
+        // Format currency
+        function formatCurrency(amount) {
+            return new Intl.NumberFormat('id-ID', {
+                style: 'currency',
+                currency: 'IDR',
+                minimumFractionDigits: 0
+            }).format(amount);
+        }
+
+        // Render bills table
+        function renderBills() {
+            const tbody = document.getElementById('billsTable');
+            tbody.innerHTML = '';
+
+            bills.forEach(bill => {
+                const row = document.createElement('tr');
+                row.className = 'hover:bg-gray-50 transition-colors duration-150';
+                
+                const statusClass = bill.status === 'paid' ? 'status-paid' : 
+                                  bill.status === 'unpaid' ? 'status-unpaid' : 'status-pending';
+                const statusText = bill.status === 'paid' ? 'Lunas' : 
+                                 bill.status === 'unpaid' ? 'Belum Bayar' : 'Pending';
+
+                row.innerHTML = `
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <div class="flex items-center">
+                            <div class="w-10 h-10 bg-gradient-to-r from-blue-400 to-purple-500 rounded-full flex items-center justify-center text-white font-semibold">
+                                ${bill.userName.charAt(0).toUpperCase()}
+                            </div>
+                            <div class="ml-4">
+                                <div class="text-sm font-medium text-gray-900">${bill.userName}</div>
+                            </div>
+                        </div>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${bill.package}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-900">${formatCurrency(bill.amount)}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${new Date(bill.date).toLocaleDateString('id-ID')}</td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <span class="${statusClass} text-white text-xs font-medium px-3 py-1 rounded-full">${statusText}</span>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
+                        <button onclick="toggleStatus('${bill.id}')" class="text-blue-600 hover:text-blue-900 transition-colors duration-150">
+                            ${bill.status === 'paid' ? 'Batalkan' : 'Bayar'}
+                        </button>
+                        <button onclick="deleteBill('${bill.id}')" class="text-red-600 hover:text-red-900 transition-colors duration-150">
+                            Hapus
+                        </button>
+                    </td>
+                `;
+                tbody.appendChild(row);
+            });
+        }
+
+        // Render customers table
+        function renderCustomers() {
+            const tbody = document.getElementById('customersTable');
+            tbody.innerHTML = '';
+
+            customers.forEach(customer => {
+                const row = document.createElement('tr');
+                row.className = 'hover:bg-gray-50 transition-colors duration-150';
+
+                row.innerHTML = `
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <div class="flex items-center">
+                            <div class="w-10 h-10 bg-gradient-to-r from-green-400 to-blue-500 rounded-full flex items-center justify-center text-white font-semibold">
+                                ${customer.name.charAt(0).toUpperCase()}
+                            </div>
+                            <div class="ml-4">
+                                <div class="text-sm font-medium text-gray-900">${customer.name}</div>
+                            </div>
+                        </div>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${customer.address}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${customer.phone}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${customer.package}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${new Date(customer.startDate).toLocaleDateString('id-ID')}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
+                        <button onclick="editCustomer('${customer.id}')" class="text-blue-600 hover:text-blue-900 transition-colors duration-150">
+                            Edit
+                        </button>
+                        <button onclick="deleteCustomer('${customer.id}')" class="text-red-600 hover:text-red-900 transition-colors duration-150">
+                            Hapus
+                        </button>
+                    </td>
+                `;
+                tbody.appendChild(row);
+            });
+        }
+
+        // Update customer dropdown in bills form
+        function updateCustomerDropdown() {
+            const select = document.getElementById('userName');
+            select.innerHTML = '<option value="">Pilih Pelanggan</option>';
+            
+            customers.forEach(customer => {
+                const option = document.createElement('option');
+                option.value = customer.name;
+                option.textContent = customer.name;
+                select.appendChild(option);
+            });
+        }
+
+        // Add new customer
+        document.getElementById('customerForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const name = document.getElementById('customerName').value;
+            const address = document.getElementById('customerAddress').value;
+            const phone = document.getElementById('customerPhone').value;
+            const package = document.getElementById('customerPackage').value;
+            const startDate = document.getElementById('customerStartDate').value;
+            
+            if (customers.length >= 500) {
+                showNotification('Maksimal 500 pelanggan sudah tercapai!', 'error');
+                return;
+            }
+
+            try {
+                await dbManager.addCustomer({
+                    name,
+                    address,
+                    phone,
+                    package,
+                    startDate
+                });
+                
+                // Reset form
+                this.reset();
+                showNotification('✅ Pelanggan berhasil ditambahkan!', 'success');
+            } catch (error) {
+                showNotification('❌ Gagal menambahkan pelanggan!', 'error');
+                console.error('Error adding customer:', error);
+            }
+        });
+
+        // Toggle input method
+        function toggleInputMethod() {
+            const method = document.querySelector('input[name="inputMethod"]:checked').value;
+            const fromCustomersFields = document.getElementById('fromCustomersFields');
+            const manualFields = document.getElementById('manualFields');
+            
+            if (method === 'fromCustomers') {
+                fromCustomersFields.classList.remove('hidden');
+                manualFields.classList.add('hidden');
+                document.getElementById('userNameManual').value = '';
+                document.getElementById('packageManual').value = '';
+            } else {
+                fromCustomersFields.classList.add('hidden');
+                manualFields.classList.remove('hidden');
+                document.getElementById('userName').value = '';
+                document.getElementById('packageFromCustomer').value = '';
+            }
+        }
+
+        // Fill customer data when selected
+        function fillCustomerData() {
+            const selectedName = document.getElementById('userName').value;
+            const customer = customers.find(c => c.name === selectedName);
+            
+            if (customer) {
+                document.getElementById('packageFromCustomer').value = customer.package;
+            } else {
+                document.getElementById('packageFromCustomer').value = '';
+            }
+        }
+
+        // Create bulk bills for all customers
+        async function createBulkBills() {
+            const bulkAmount = parseInt(document.getElementById('bulkAmount').value);
+            
+            if (!bulkAmount || bulkAmount <= 0) {
+                showNotification('Masukkan jumlah tagihan yang valid!', 'error');
+                return;
+            }
+
+            if (customers.length === 0) {
+                showNotification('Tidak ada pelanggan untuk dibuatkan tagihan!', 'error');
+                return;
+            }
+
+            let createdCount = 0;
+            const currentDate = new Date().toISOString().split('T')[0];
+
+            try {
+                for (const customer of customers) {
+                    const existingBill = bills.find(bill => 
+                        bill.userName === customer.name && 
+                        bill.date === currentDate
+                    );
+
+                    if (!existingBill) {
+                        await dbManager.addBill({
+                            userName: customer.name,
+                            package: customer.package,
+                            amount: bulkAmount,
+                            date: currentDate,
+                            status: 'unpaid'
+                        });
+                        createdCount++;
+                    }
+                }
+
+                if (createdCount > 0) {
+                    showNotification(`✅ ${createdCount} tagihan berhasil dibuat!`, 'success');
+                    document.getElementById('bulkAmount').value = '';
+                } else {
+                    showNotification('⚠️ Semua pelanggan sudah memiliki tagihan hari ini!', 'warning');
+                }
+            } catch (error) {
+                showNotification('❌ Gagal membuat tagihan bulk!', 'error');
+                console.error('Error creating bulk bills:', error);
+            }
+        }
+
+        // Add new bill
+        document.getElementById('billForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const method = document.querySelector('input[name="inputMethod"]:checked').value;
+            let userName, package;
+            
+            if (method === 'fromCustomers') {
+                userName = document.getElementById('userName').value;
+                package = document.getElementById('packageFromCustomer').value;
+                
+                if (!userName) {
+                    showNotification('Pilih pelanggan terlebih dahulu!', 'error');
+                    return;
+                }
+            } else {
+                userName = document.getElementById('userNameManual').value;
+                package = document.getElementById('packageManual').value;
+                
+                if (!userName || !package) {
+                    showNotification('Lengkapi nama dan paket terlebih dahulu!', 'error');
+                    return;
+                }
+            }
+            
+            const amount = parseInt(document.getElementById('amount').value);
+            
+            if (!amount || amount <= 0) {
+                showNotification('Masukkan jumlah tagihan yang valid!', 'error');
+                return;
+            }
+
+            try {
+                await dbManager.addBill({
+                    userName,
+                    package,
+                    amount,
+                    date: new Date().toISOString().split('T')[0],
+                    status: 'unpaid'
+                });
+
+                // Reset form
+                this.reset();
+                document.getElementById('packageFromCustomer').value = '';
+                showNotification('✅ Tagihan berhasil ditambahkan!', 'success');
+            } catch (error) {
+                showNotification('❌ Gagal menambahkan tagihan!', 'error');
+                console.error('Error adding bill:', error);
+            }
+        });
+
+        // Toggle payment status
+        async function toggleStatus(id) {
+            const bill = bills.find(b => b.id === id);
+            if (bill) {
+                const newStatus = bill.status === 'paid' ? 'unpaid' : 'paid';
+                try {
+                    await dbManager.updateBill(id, { status: newStatus });
+                    showNotification(`✅ Status pembayaran ${bill.userName} berhasil diubah!`, 'success');
+                } catch (error) {
+                    showNotification('❌ Gagal mengubah status pembayaran!', 'error');
+                    console.error('Error updating bill status:', error);
+                }
+            }
+        }
+
+        // Delete bill
+        async function deleteBill(id) {
+            if (confirm('Yakin ingin menghapus tagihan ini?')) {
+                try {
+                    await dbManager.deleteBill(id);
+                    showNotification('✅ Tagihan berhasil dihapus!', 'success');
+                } catch (error) {
+                    showNotification('❌ Gagal menghapus tagihan!', 'error');
+                    console.error('Error deleting bill:', error);
+                }
+            }
+        }
+
+        // Delete customer
+        async function deleteCustomer(id) {
+            if (confirm('Yakin ingin menghapus pelanggan ini?')) {
+                try {
+                    await dbManager.deleteCustomer(id);
+                    showNotification('✅ Pelanggan berhasil dihapus!', 'success');
+                } catch (error) {
+                    showNotification('❌ Gagal menghapus pelanggan!', 'error');
+                    console.error('Error deleting customer:', error);
+                }
+            }
+        }
+
+        // Edit customer (simple implementation)
+        function editCustomer(id) {
+            const customer = customers.find(c => c.id === id);
+            if (customer) {
+                document.getElementById('customerName').value = customer.name;
+                document.getElementById('customerAddress').value = customer.address;
+                document.getElementById('customerPhone').value = customer.phone;
+                document.getElementById('customerPackage').value = customer.package;
+                document.getElementById('customerStartDate').value = customer.startDate;
+                
+                showNotification('📝 Data pelanggan dimuat untuk diedit!', 'success');
+            }
+        }
+
+        // Download Excel template
+        function downloadTemplate() {
+            const wb = XLSX.utils.book_new();
+            const ws_data = [
+                ['Nama', 'Alamat', 'Telepon', 'Paket', 'Tanggal_Mulai'],
+                ['Ahmad Rizki', 'Jl. Merdeka No. 123', '081234567890', 'Premium - 50 Mbps', '2024-01-01'],
+                ['Siti Nurhaliza', 'Jl. Sudirman No. 456', '081234567891', 'Standard - 25 Mbps', '2024-01-01']
+            ];
+            const ws = XLSX.utils.aoa_to_sheet(ws_data);
+            XLSX.utils.book_append_sheet(wb, ws, 'Template Pelanggan');
+            XLSX.writeFile(wb, 'template_pelanggan.xlsx');
+            showNotification('📥 Template Excel berhasil diunduh!', 'success');
+        }
+
+        // Import from Excel
+        async function importFromExcel() {
+            const fileInput = document.getElementById('excelFile');
+            const file = fileInput.files[0];
+            
+            if (!file) {
+                showNotification('Pilih file Excel terlebih dahulu!', 'error');
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = async function(e) {
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, { type: 'array' });
+                    const sheetName = workbook.SheetNames[0];
+                    const worksheet = workbook.Sheets[sheetName];
+                    const jsonData = XLSX.utils.sheet_to_json(worksheet);
+
+                    if (jsonData.length === 0) {
+                        showNotification('File Excel kosong atau tidak ada data!', 'error');
+                        return;
+                    }
+
+                    let importedCount = 0;
+                    let errorMessages = [];
+                    let skippedCount = 0;
+                    const validPackages = ['Basic - 10 Mbps', 'Standard - 25 Mbps', 'Premium - 50 Mbps', 'Ultra - 100 Mbps'];
+
+                    for (const [index, row] of jsonData.entries()) {
+                        const rowNumber = index + 2;
+                        let rowErrors = [];
+
+                        if (customers.length >= 500) {
+                            skippedCount++;
+                            continue;
+                        }
+
+                        // Validation logic (same as before)
+                        if (!row.Nama || row.Nama.toString().trim() === '') {
+                            rowErrors.push('Nama kosong');
+                        }
+                        if (!row.Alamat || row.Alamat.toString().trim() === '') {
+                            rowErrors.push('Alamat kosong');
+                        }
+                        if (!row.Telepon || row.Telepon.toString().trim() === '') {
+                            rowErrors.push('Telepon kosong');
+                        }
+                        if (!row.Paket || row.Paket.toString().trim() === '') {
+                            rowErrors.push('Paket kosong');
+                        } else if (!validPackages.includes(row.Paket.toString().trim())) {
+                            rowErrors.push(`Paket tidak valid`);
+                        }
+                        if (!row.Tanggal_Mulai || row.Tanggal_Mulai.toString().trim() === '') {
+                            rowErrors.push('Tanggal Mulai kosong');
+                        }
+
+                        if (rowErrors.length > 0) {
+                            errorMessages.push(`Baris ${rowNumber}: ${rowErrors.join(', ')}`);
+                        } else {
+                            try {
+                                await dbManager.addCustomer({
+                                    name: row.Nama.toString().trim(),
+                                    address: row.Alamat.toString().trim(),
+                                    phone: row.Telepon.toString().trim(),
+                                    package: row.Paket.toString().trim(),
+                                    startDate: new Date(row.Tanggal_Mulai).toISOString().split('T')[0]
+                                });
+                                importedCount++;
+                            } catch (error) {
+                                errorMessages.push(`Baris ${rowNumber}: Gagal menyimpan data`);
+                            }
+                        }
+                    }
+
+                    // Show results
+                    if (importedCount > 0) {
+                        showNotification(`✅ ${importedCount} pelanggan berhasil diimport!`, 'success');
+                    }
+
+                    if (errorMessages.length > 0) {
+                        const errorDiv = document.createElement('div');
+                        errorDiv.className = 'fixed top-4 right-4 z-50 bg-red-500 text-white p-4 rounded-lg max-w-md max-h-96 overflow-y-auto';
+                        errorDiv.innerHTML = `
+                            <div class="flex justify-between items-start mb-2">
+                                <h4 class="font-semibold">❌ Error Import (${errorMessages.length} baris)</h4>
+                                <button onclick="this.parentElement.parentElement.remove()" class="text-white hover:text-gray-200">✕</button>
+                            </div>
+                            <div class="text-sm space-y-1">
+                                ${errorMessages.slice(0, 10).map(msg => `<div>• ${msg}</div>`).join('')}
+                                ${errorMessages.length > 10 ? `<div class="font-semibold">... dan ${errorMessages.length - 10} error lainnya</div>` : ''}
+                            </div>
+                        `;
+                        document.body.appendChild(errorDiv);
+                        
+                        setTimeout(() => {
+                            if (errorDiv.parentElement) {
+                                errorDiv.remove();
+                            }
+                        }, 10000);
+                    }
+
+                    fileInput.value = '';
+                } catch (error) {
+                    showNotification('❌ Error membaca file Excel!', 'error');
+                    console.error('Excel import error:', error);
+                }
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
+        // Show notification
+        function showNotification(message, type) {
+            const notification = document.createElement('div');
+            const bgColor = type === 'success' ? 'bg-green-500' : 
+                           type === 'warning' ? 'bg-yellow-500' : 'bg-red-500';
+            notification.className = `fixed top-4 right-4 z-50 px-6 py-3 rounded-lg text-white font-medium transform transition-all duration-300 ${bgColor}`;
+            notification.textContent = message;
+            
+            document.body.appendChild(notification);
+            
+            setTimeout(() => {
+                notification.style.transform = 'translateX(100%)';
+                setTimeout(() => notification.remove(), 300);
+            }, 3000);
+        }
+
+        // Export to PDF
+        function exportToPDF() {
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF();
+            
+            doc.setFontSize(20);
+            doc.text('Laporan Tagihan Internet', 20, 20);
+            
+            doc.setFontSize(12);
+            doc.text(`Tanggal: ${new Date().toLocaleDateString('id-ID')}`, 20, 35);
+            
+            const tableData = bills.map(bill => [
+                bill.userName,
+                bill.package,
+                formatCurrency(bill.amount),
+                new Date(bill.date).toLocaleDateString('id-ID'),
+                bill.status === 'paid' ? 'Lunas' : bill.status === 'unpaid' ? 'Belum Bayar' : 'Pending'
+            ]);
+            
+            doc.autoTable({
+                head: [['Nama', 'Paket', 'Jumlah', 'Tanggal', 'Status']],
+                body: tableData,
+                startY: 45,
+                styles: { fontSize: 10, cellPadding: 3 },
+                headStyles: { fillColor: [102, 126, 234], textColor: 255 }
+            });
+            
+            const finalY = doc.lastAutoTable.finalY + 20;
+            doc.setFontSize(12);
+            doc.text('Ringkasan:', 20, finalY);
+            doc.text(`Total Pengguna: ${bills.length}`, 20, finalY + 10);
+            doc.text(`Sudah Bayar: ${bills.filter(b => b.status === 'paid').length}`, 20, finalY + 20);
+            doc.text(`Belum Bayar: ${bills.filter(b => b.status === 'unpaid').length}`, 20, finalY + 30);
+            doc.text(`Total Tagihan: ${formatCurrency(bills.reduce((sum, bill) => sum + bill.amount, 0))}`, 20, finalY + 40);
+            
+            doc.save(`tagihan-internet-${new Date().toISOString().split('T')[0]}.pdf`);
+            showNotification('📄 PDF berhasil diunduh!', 'success');
+        }
+
+        // Set default start date to today
+        document.addEventListener('DOMContentLoaded', function() {
+            document.getElementById('customerStartDate').value = new Date().toISOString().split('T')[0];
+        });
+    </script>
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'97b3f405b25ffd96',t:'MTc1NzIyNDQ4NS4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</html>
